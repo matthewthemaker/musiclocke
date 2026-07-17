@@ -1,0 +1,1481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UsBox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+<style>
+  html, body, #root { margin: 0; height: 100%; }
+  * { box-sizing: border-box; }
+  :root {
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  button { font-family: var(--font-body); }
+</style>
+</head>
+<body>
+  <div id="root">
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;background:#1B211D;color:#8FA396;font-family:sans-serif;">
+      Loading UsBox…
+    </div>
+  </div>
+
+<script type="text/babel" data-presets="react">
+const { useCallback, useEffect, useMemo, useRef, useState } = React;
+
+// ---------------------------------------------------------------------------
+// Inline icon set (small SVGs)
+// ---------------------------------------------------------------------------
+const Icon = ({ path, size = 16, ...rest }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...rest}>
+    {path}
+  </svg>
+);
+const StickyIcon = (p) => <Icon {...p} path={<><path d="M3 3h13l5 5v13H3z"/><path d="M16 3v5h5"/></>} />;
+const PencilIcon = (p) => <Icon {...p} path={<><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></>} />;
+const Volume2Icon = (p) => <Icon {...p} path={<><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></>} />;
+const Link2Icon = (p) => <Icon {...p} path={<><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></>} />;
+const MousePointerIcon = (p) => <Icon {...p} path={<path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>} />;
+const PlusIcon = (p) => <Icon {...p} path={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>} />;
+const XIcon = (p) => <Icon {...p} path={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>} />;
+const ZoomInIcon = (p) => <Icon {...p} path={<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></>} />;
+const ZoomOutIcon = (p) => <Icon {...p} path={<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></>} />;
+const CrosshairIcon = (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></>} />;
+const MicIcon = (p) => <Icon {...p} path={<><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></>} />;
+const MicOffIcon = (p) => <Icon {...p} path={<><line x1="2" y1="2" x2="22" y2="22"/><path d="M9 9v3a3 3 0 0 0 4.6 2.54M15 9.34V5a3 3 0 0 0-5.87-.9"/><path d="M17 16.95A7 7 0 0 1 5 12v-2"/><path d="M19 10v1a6.97 6.97 0 0 1-.32 2.1"/><line x1="12" y1="19" x2="12" y2="22"/></>} />;
+const MonitorIcon = (p) => <Icon {...p} path={<><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></>} />;
+const ClipboardListIcon = (p) => <Icon {...p} path={<><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></>} />;
+
+// ---------------------------------------------------------------------------
+// Constants & Persistent Identity Setup
+// ---------------------------------------------------------------------------
+const SELF_NAME_KEY = 'usbox:selfName';
+const SELF_COLOR_KEY = 'usbox:selfColor';
+
+function getSelfIdentity() {
+  let name = localStorage.getItem(SELF_NAME_KEY);
+  let color = localStorage.getItem(SELF_COLOR_KEY);
+  const colors = ['#E7A93D', '#4FB3A9', '#EF709B', '#A23BE7', '#3BA2E7', '#56E39F'];
+  if (!name) {
+    name = 'Peer_' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    localStorage.setItem(SELF_NAME_KEY, name);
+  }
+  if (!color) {
+    color = colors[Math.floor(Math.random() * colors.length)];
+    localStorage.setItem(SELF_COLOR_KEY, color);
+  }
+  return { name, color };
+}
+
+const { name: SELF_NAME, color: SELF_COLOR } = getSelfIdentity();
+const FREE_CANVAS_BOUND = 2000;
+const IS_PREMIUM = false;
+const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
+
+const SOUND_PACK = [
+  { id: 'airhorn', label: 'Airhorn', emoji: '📯' },
+  { id: 'laugh', label: 'Laugh track', emoji: '😂' },
+  { id: 'buzzer', label: 'Buzzer', emoji: '⛔' },
+  { id: 'applause', label: 'Applause', emoji: '👏' },
+];
+
+function extractYouTubeId(url) {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
+// YouTube IFrame API loader (for synced playback)
+let ytApiReady = null;
+function loadYouTubeAPI() {
+  if (window.YT?.Player) return Promise.resolve();
+  if (ytApiReady) return ytApiReady;
+  ytApiReady = new Promise((resolve) => {
+    window.onYouTubeIframeAPIReady = () => resolve();
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  });
+  return ytApiReady;
+}
+
+// Lightweight message bus for WebRTC / video sync between cards and the room socket
+function createMessageBus() {
+  const listeners = new Set();
+  return {
+    emit(msg) { listeners.forEach((fn) => fn(msg)); },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  };
+}
+const rtcBus = createMessageBus();
+const videoBus = createMessageBus();
+
+const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+
+function shouldProcessTargeted(msg, myUserId) {
+  return !msg.targetUserId || msg.targetUserId === myUserId;
+}
+function uid(prefix) { return `${prefix}_${Math.random().toString(36).slice(2, 9)}`; }
+function worldToScreen(p, vp) { return { x: (p.x - vp.x) * vp.zoom, y: (p.y - vp.y) * vp.zoom }; }
+function screenToWorld(p, vp) { return { x: p.x / vp.zoom + vp.x, y: p.y / vp.zoom + vp.y }; }
+function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function nextLayer(objects) { return Math.max(0, ...objects.map((o) => o.layer)) + 1; }
+function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
+
+// ---------------------------------------------------------------------------
+// Room codes + local saved rooms
+// ---------------------------------------------------------------------------
+const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function genRoomCode(len = 6) {
+  let s = '';
+  for (let i = 0; i < len; i++) s += ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)];
+  return s;
+}
+function getRoomCodeFromLocation() {
+  const m = window.location.hash.match(/room=([A-Za-z0-9]{4,10})/);
+  return m ? m[1].toUpperCase() : null;
+}
+function setRoomCodeInLocation(code) {
+  const url = `${window.location.pathname}${window.location.search}#room=${code}`;
+  window.history.replaceState(null, '', url);
+}
+const ROOM_STATE_PREFIX = 'usbox:room:';
+const SAVED_ROOMS_KEY = 'usbox:savedRooms';
+function loadRoomState(code) {
+  try {
+    const raw = localStorage.getItem(ROOM_STATE_PREFIX + code);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function saveRoomState(code, state) {
+  try { localStorage.setItem(ROOM_STATE_PREFIX + code, JSON.stringify(state)); } catch { }
+}
+function loadSavedRooms() {
+  try {
+    const raw = localStorage.getItem(SAVED_ROOMS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function upsertSavedRoom(code, title) {
+  const rooms = loadSavedRooms();
+  const idx = rooms.findIndex((r) => r.code === code);
+  const entry = { code, title, lastOpened: Date.now() };
+  if (idx >= 0) rooms[idx] = entry; else rooms.push(entry);
+  rooms.sort((a, b) => b.lastOpened - a.lastOpened);
+  try { localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(rooms.slice(0, 30))); } catch { }
+  return rooms;
+}
+function removeSavedRoom(code) {
+  const rooms = loadSavedRooms().filter((r) => r.code !== code);
+  try { localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(rooms)); } catch { }
+  return rooms;
+}
+function timeAgo(ts) {
+  const min = Math.floor((Date.now() - ts) / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+function initRoomFromLocation() {
+  const existing = getRoomCodeFromLocation();
+  const code = existing || genRoomCode();
+  if (!existing) setRoomCodeInLocation(code);
+  const saved = loadRoomState(code);
+  return {
+    code,
+    title: saved?.title || 'Collaboration Box',
+    objects: saved?.objects || [],
+    connectors: saved?.connectors || [],
+  };
+}
+function centerW(o) { return o.w ?? 200; }
+function centerH(o) { return o.h ?? 140; }
+
+// ---------------------------------------------------------------------------
+// Reliable real-time syncing using EMQX public secure MQTT Broker
+// ---------------------------------------------------------------------------
+function useRoomSocket(roomCode, selfName, selfColor, onRemoteSync, getLocalState) {
+  const clientRef = useRef(null);
+  const [presence, setPresence] = useState({});
+  const myUserId = useRef(uid('user')).current;
+  const topic = `usbox/rooms/${roomCode.toLowerCase()}`;
+
+  useEffect(() => {
+    // Connect to EMQX secure websocket endpoint
+    const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+    clientRef.current = client;
+
+    client.on('connect', () => {
+      client.subscribe(topic, (err) => {
+        if (!err) {
+          // Tell everyone in the room we just joined
+          const joinMsg = JSON.stringify({ t: 'presence:join', userId: myUserId, name: selfName, color: selfColor });
+          client.publish(topic, joinMsg);
+        }
+      });
+    });
+
+    client.on('message', (top, payload) => {
+      try {
+        const msg = JSON.parse(payload.toString());
+        // Ignore our own looped back messages
+        if (msg.userId === myUserId) return;
+
+        if (msg.t === 'presence:join') {
+          setPresence((prev) => ({ ...prev, [msg.userId]: { userId: msg.userId, name: msg.name, color: msg.color } }));
+          // Welcome them and send our identity back
+          const welcomeMsg = JSON.stringify({ t: 'presence:welcome_reply', userId: myUserId, name: selfName, color: selfColor });
+          client.publish(topic, welcomeMsg);
+
+          // IMPORTANT: If we have existing items in our room, send the entire current canvas state 
+          // so the new person has the exact same layout instantly!
+          const localState = getLocalState();
+          if (localState.objects.length > 0 || localState.connectors.length > 0) {
+            client.publish(topic, JSON.stringify({
+              t: 'room:initial_sync',
+              userId: myUserId,
+              title: localState.title,
+              objects: localState.objects,
+              connectors: localState.connectors
+            }));
+          }
+        }
+        if (msg.t === 'presence:welcome_reply') {
+          setPresence((prev) => ({ ...prev, [msg.userId]: { userId: msg.userId, name: msg.name, color: msg.color } }));
+        }
+        if (msg.t === 'presence:cursor') {
+          setPresence((prev) => ({ 
+            ...prev, 
+            [msg.userId]: { 
+              ...(prev[msg.userId] ?? { name: '?', color: '#888' }), 
+              userId: msg.userId, 
+              cursor: { x: msg.x, y: msg.y } 
+            } 
+          }));
+        }
+        if (msg.t === 'presence:leave') {
+          setPresence((prev) => { const next = { ...prev }; delete next[msg.userId]; return next; });
+        }
+        if (msg.t === 'presence:mic') {
+          setPresence((prev) => ({ ...prev, [msg.userId]: { ...(prev[msg.userId] ?? { name: '?', color: '#888' }), userId: msg.userId, micOn: msg.micOn } }));
+        }
+        
+        onRemoteSync(msg);
+      } catch (e) {
+        console.error("Failed to parse packet", e);
+      }
+    });
+
+    return () => {
+      if (client.connected) {
+        client.publish(topic, JSON.stringify({ t: 'presence:leave', userId: myUserId }), {}, () => {
+          client.end();
+        });
+      } else {
+        client.end();
+      }
+    };
+  }, [roomCode, selfName, selfColor, onRemoteSync, getLocalState, myUserId, topic]);
+
+  const send = useCallback((envelope) => {
+    const client = clientRef.current;
+    if (client && client.connected) {
+      client.publish(topic, JSON.stringify({ ...envelope, userId: myUserId }));
+    }
+  }, [myUserId, topic]);
+
+  return { send, presence, myUserId };
+}
+
+// ---------------------------------------------------------------------------
+// Drag / resize hooks
+// ---------------------------------------------------------------------------
+function useDrag(x, y, onMove, zoom) {
+  const dragging = useRef(false);
+  const start = useRef({ mouseX: 0, mouseY: 0, x, y });
+  const onPointerDown = useCallback((e) => {
+    e.stopPropagation();
+    dragging.current = true;
+    start.current = { mouseX: e.clientX, mouseY: e.clientY, x, y };
+    const onMoveHandler = (ev) => {
+      if (!dragging.current) return;
+      const dx = (ev.clientX - start.current.mouseX) / zoom;
+      const dy = (ev.clientY - start.current.mouseY) / zoom;
+      onMove(start.current.x + dx, start.current.y + dy);
+    };
+    const onUpHandler = () => {
+      dragging.current = false;
+      window.removeEventListener('pointermove', onMoveHandler);
+      window.removeEventListener('pointerup', onUpHandler);
+    };
+    window.addEventListener('pointermove', onMoveHandler);
+    window.addEventListener('pointerup', onUpHandler);
+  }, [x, y, zoom, onMove]);
+  return { onPointerDown };
+}
+
+function useResize(w, h, onResize, zoom) {
+  const start = useRef({ mouseX: 0, mouseY: 0, w, h });
+  const onPointerDown = useCallback((e) => {
+    e.stopPropagation();
+    start.current = { mouseX: e.clientX, mouseY: e.clientY, w, h };
+    const onMoveHandler = (ev) => {
+      const dx = (ev.clientX - start.current.mouseX) / zoom;
+      const dy = (ev.clientY - start.current.mouseY) / zoom;
+      onResize(start.current.w + dx, start.current.h + dy);
+    };
+    const onUpHandler = () => {
+      window.removeEventListener('pointermove', onMoveHandler);
+      window.removeEventListener('pointerup', onUpHandler);
+    };
+    window.addEventListener('pointermove', onMoveHandler);
+    window.addEventListener('pointerup', onUpHandler);
+  }, [w, h, zoom, onResize]);
+  return { onPointerDown };
+}
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+const ROOT_STYLE = { position: 'relative', width: '100%', height: '100vh', background: '#1B211D', overflow: 'hidden', fontFamily: 'var(--font-body)' };
+const CANVAS_STYLE = { position: 'absolute', inset: 0, overflow: 'hidden', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', overscrollBehavior: 'contain' };
+const TOPBAR_STYLE = { position: 'absolute', top: 0, left: 0, right: 0, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: 'rgba(15,23,18,0.72)', backdropFilter: 'blur(6px)', zIndex: 50, borderBottom: '1px solid rgba(251,246,236,0.08)' };
+const TOOLBAR_STYLE = { position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 8, background: '#1B211D', border: '1px solid rgba(251,246,236,0.12)', borderRadius: 12, padding: 8, boxShadow: '0 12px 30px rgba(0,0,0,0.45)', zIndex: 50 };
+const ZOOM_CTRL_STYLE = { position: 'absolute', bottom: 20, right: 20, display: 'flex', alignItems: 'center', gap: 4, background: '#1B211D', border: '1px solid rgba(251,246,236,0.12)', borderRadius: 10, padding: 6, zIndex: 50 };
+const TOOL_BTN_STYLE = { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, border: 'none', cursor: 'pointer' };
+const PRIMARY_BTN = { display: 'flex', alignItems: 'center', gap: 4, background: '#E7A93D', color: '#1B211D', border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' };
+const TINY_BTN = { background: 'transparent', border: '1px solid rgba(143,163,150,0.4)', color: '#8FA396', borderRadius: 5, fontSize: 10, fontFamily: 'var(--font-mono)', padding: '2px 6px', cursor: 'pointer' };
+const URL_INPUT_STYLE = { width: 220, background: '#26312B', border: '1px solid rgba(251,246,236,0.12)', borderRadius: 8, color: '#FBF6EC', fontSize: 12, padding: '8px 10px', outline: 'none' };
+const RESIZE_HANDLE_STYLE = { position: 'absolute', right: 2, bottom: 2, width: 14, height: 14, cursor: 'nwse-resize', borderRight: '2px solid rgba(251,246,236,0.4)', borderBottom: '2px solid rgba(251,246,236,0.4)' };
+const SOUND_PAD_STYLE = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '10px 4px', borderRadius: 8, border: 'none', color: '#FBF6EC', cursor: 'pointer', transition: 'transform 0.12s ease, background 0.12s ease' };
+const FREE_TIER_BADGE = { position: 'absolute', top: 54, left: 16, background: 'rgba(27,33,29,0.85)', border: '1px solid rgba(251,246,236,0.1)', color: '#8FA396', fontSize: 11, fontFamily: 'var(--font-mono)', padding: '5px 9px', borderRadius: 7, zIndex: 40 };
+const FILE_PROTOCOL_NOTICE = { position: 'absolute', top: 90, left: 16, maxWidth: 380, background: 'rgba(231,169,61,0.14)', border: '1px solid rgba(231,169,61,0.5)', color: '#F4DFAE', fontSize: 12, fontFamily: 'var(--font-mono)', padding: '12px 14px', borderRadius: 9, zIndex: 40, lineHeight: 1.5, boxShadow: '0 12px 30px rgba(0,0,0,0.45)' };
+const ROOM_PANEL_STYLE = { position: 'absolute', top: 54, right: 16, width: 260, background: '#1B211D', border: '1px solid rgba(251,246,236,0.12)', borderRadius: 12, padding: 14, boxShadow: '0 12px 30px rgba(0,0,0,0.45)', zIndex: 60 };
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+function TopBar({ userCount, roomTitle, onRenameTitle, roomCode, premium, roomPanelOpen, onToggleRoomPanel, micOn, onToggleMic, micError }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(roomTitle);
+  useEffect(() => { setDraft(roomTitle); }, [roomTitle]);
+  const commit = () => { onRenameTitle(draft.trim() || roomTitle); setEditing(false); };
+  return (
+    <div style={TOPBAR_STYLE}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, color: '#FBF6EC', letterSpacing: 0.2 }}>UsBox</span>
+        {editing ? (
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(roomTitle); setEditing(false); } }}
+            style={{ background: '#26312B', border: '1px solid rgba(251,246,236,0.2)', borderRadius: 5, color: '#FBF6EC', fontSize: 13, padding: '3px 7px', outline: 'none', width: 200 }}
+          />
+        ) : (
+          <span onClick={() => setEditing(true)} title="Click to rename this Box" style={{ color: '#8FA396', fontSize: 13, fontFamily: 'var(--font-mono)', cursor: 'text', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>/{slugify(roomTitle)}</span>
+        )}
+        {premium && <span style={{ fontSize: 11, background: '#4FB3A9', color: '#0F1712', padding: '2px 7px', borderRadius: 4, fontWeight: 700, flexShrink: 0 }}>PLUS</span>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#CBD6CE', fontSize: 13, fontFamily: 'var(--font-mono)' }}>
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: '#4FB3A9', display: 'inline-block' }} />
+          {userCount} in the box
+        </div>
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={onToggleMic}
+            title={micOn ? 'Mic on — click to mute' : 'Mic off — click to talk'}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: micOn ? '#4FB3A9' : '#26312B', color: micOn ? '#0F1712' : '#8FA396', border: '1px solid rgba(251,246,236,0.14)', borderRadius: 8, padding: '6px 9px', cursor: 'pointer' }}
+          >
+            {micOn ? <MicIcon size={15} /> : <MicOffIcon size={15} />}
+          </button>
+          {micError && (
+            <div style={{ position: 'absolute', top: '120%', right: 0, width: 200, background: '#1B211D', border: '1px solid rgba(231,169,61,0.5)', color: '#F4DFAE', fontSize: 11, fontFamily: 'var(--font-mono)', padding: '8px 10px', borderRadius: 8, lineHeight: 1.4, boxShadow: '0 12px 30px rgba(0,0,0,0.45)', zIndex: 70 }}>
+              {micError}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={onToggleRoomPanel}
+          title="Room code — invite people or switch rooms"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: roomPanelOpen ? '#4FB3A9' : '#26312B', color: roomPanelOpen ? '#0F1712' : '#FBF6EC', border: '1px solid rgba(251,246,236,0.14)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, letterSpacing: 1 }}
+        >
+          {roomCode}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RoomPanel({ roomCode, savedRooms, onCreateNew, onJoin, onSwitch, onRemove, onClose }) {
+  const [joinInput, setJoinInput] = useState('');
+  const [copied, setCopied] = useState(false);
+  const link = `${window.location.origin}${window.location.pathname}#room=${roomCode}`;
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { }
+  };
+  const tryJoin = () => { const c = joinInput.trim().toUpperCase(); if (c) onJoin(c); };
+  return (
+    <div style={ROOM_PANEL_STYLE}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#8FA396', textTransform: 'uppercase', letterSpacing: 1 }}>This room</span>
+        <XIcon size={14} style={{ cursor: 'pointer', color: '#8FA396' }} onClick={onClose} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, letterSpacing: 3, color: '#E7A93D', fontWeight: 700 }}>{roomCode}</span>
+        <button onClick={copyLink} style={{ ...TINY_BTN, padding: '5px 9px' }}>{copied ? 'Copied!' : 'Copy invite link'}</button>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#8FA396', textTransform: 'uppercase', letterSpacing: 1 }}>Join a room</span>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <input value={joinInput} onChange={(e) => setJoinInput(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && tryJoin()} placeholder="Enter code…" maxLength={10} style={{ ...URL_INPUT_STYLE, width: 130 }} />
+          <button onClick={tryJoin} style={PRIMARY_BTN}>Join</button>
+        </div>
+        <button onClick={onCreateNew} style={{ ...TINY_BTN, marginTop: 8, width: '100%', padding: '6px 0' }}>+ New room</button>
+      </div>
+      <div>
+        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#8FA396', textTransform: 'uppercase', letterSpacing: 1 }}>Saved rooms</span>
+        <div style={{ maxHeight: 200, overflowY: 'auto', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {savedRooms.length === 0 && <span style={{ fontSize: 12, color: '#5A6B60' }}>No rooms yet</span>}
+          {savedRooms.map((r) => (
+            <div
+              key={r.code}
+              onClick={() => r.code !== roomCode && onSwitch(r.code)}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 6, cursor: r.code === roomCode ? 'default' : 'pointer', background: r.code === roomCode ? 'rgba(231,169,61,0.14)' : 'transparent' }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span style={{ fontSize: 12, color: '#FBF6EC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{r.title}</span>
+                <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: '#8FA396' }}>{r.code} · {timeAgo(r.lastOpened)}</span>
+              </div>
+              {r.code !== roomCode && <XIcon size={11} style={{ color: '#5A6B60', cursor: 'pointer', flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); onRemove(r.code); }} />}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeltBackground({ viewport, bound }) {
+  const dotSpacing = 28 * viewport.zoom;
+  const offsetX = (-viewport.x * viewport.zoom) % dotSpacing;
+  const offsetY = (-viewport.y * viewport.zoom) % dotSpacing;
+  const boundRect = bound ? worldToScreen({ x: -bound / 2, y: -bound / 2 }, viewport) : null;
+  return (
+    <>
+      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(203, 214, 206, 0.16) 1px, transparent 1px)', backgroundSize: `${dotSpacing}px ${dotSpacing}px`, backgroundPosition: `${offsetX}px ${offsetY}px` }} />
+      {bound && boundRect && (
+        <div style={{ position: 'absolute', left: boundRect.x, top: boundRect.y, width: bound * viewport.zoom, height: bound * viewport.zoom, border: '2px dashed rgba(231, 169, 61, 0.35)', borderRadius: 12, pointerEvents: 'none' }} />
+      )}
+    </>
+  );
+}
+
+function VideoFallbackCard({ youtubeId, height }) {
+  const [copied, setCopied] = useState(false);
+  const copyCmd = async () => {
+    try {
+      await navigator.clipboard.writeText('python3 -m http.server 8000');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { }
+  };
+  return (
+    <div style={{ position: 'relative', width: '100%', height, background: '#000' }}>
+      <a
+        href={`https://www.youtube.com/watch?v=${youtubeId}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        onPointerDown={(e) => e.stopPropagation()}
+        style={{ display: 'block', width: '100%', height: '100%', position: 'relative' }}
+      >
+        <img src={`https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55, display: 'block' }} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#FBF6EC', textAlign: 'center', padding: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 999, background: 'rgba(231,169,61,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: 0, height: 0, borderTop: '9px solid transparent', borderBottom: '9px solid transparent', borderLeft: '14px solid #1B211D', marginLeft: 3 }} />
+          </div>
+          <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>Opens on YouTube in a new tab</span>
+        </div>
+      </a>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(15,23,18,0.92)', padding: '6px 8px', fontSize: 10, fontFamily: 'var(--font-mono)', color: '#8FA396', lineHeight: 1.5 }}>
+        Can't play inline from a double-clicked file — YouTube requires a real address.{' '}
+        <button onPointerDown={(e) => e.stopPropagation()} onClick={copyCmd} style={{ ...TINY_BTN, marginLeft: 2 }}>{copied ? 'Copied!' : 'Copy fix'}</button>
+      </div>
+    </div>
+  );
+}
+
+function VideoWindowCard({ win, selected, onFocus, onChange, onDelete, onClickForConnect, connectMode, viewportZoom, send, syncState }) {
+  const dragRef = useDrag(win.x, win.y, (x, y) => onChange({ x, y }), viewportZoom);
+  const resizeRef = useResize(win.w, win.h, (w, h) => onChange({ w: Math.max(220, w), h: Math.max(140, h) }), viewportZoom);
+  const playerHostRef = useRef(null);
+  const playerRef = useRef(null);
+  const applyingRemote = useRef(false);
+  const lastRemoteApply = useRef(0);
+  const lastSyncSend = useRef(0);
+  const [playerReady, setPlayerReady] = useState(false);
+
+  const broadcastSync = useCallback(() => {
+    const p = playerRef.current;
+    if (!win.syncEnabled || !p?.getCurrentTime || applyingRemote.current) return;
+    const now = Date.now();
+    if (now - lastSyncSend.current < 250) return;
+    lastSyncSend.current = now;
+    send({
+      t: 'video:sync',
+      objId: win.id,
+      playing: p.getPlayerState() === YT.PlayerState.PLAYING,
+      currentTime: p.getCurrentTime(),
+      videoId: win.youtubeId,
+    });
+  }, [win.syncEnabled, win.id, win.youtubeId, send]);
+
+  useEffect(() => {
+    if (IS_FILE_PROTOCOL) return;
+    let player = null;
+    let cancelled = false;
+    setPlayerReady(false);
+    loadYouTubeAPI().then(() => {
+      if (cancelled || !playerHostRef.current) return;
+      player = new YT.Player(playerHostRef.current, {
+        videoId: win.youtubeId,
+        width: '100%',
+        height: win.h - 30,
+        playerVars: { playsinline: 1, rel: 0, enablejsapi: 1, origin: window.location.origin },
+        events: {
+          onReady: () => { if (!cancelled) { playerRef.current = player; setPlayerReady(true); } },
+          onStateChange: (e) => {
+            if (!win.syncEnabled || applyingRemote.current || Date.now() - lastRemoteApply.current < 1500) return;
+            if (e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.BUFFERING) {
+              broadcastSync();
+            }
+          },
+        },
+      });
+    });
+    return () => {
+      cancelled = true;
+      player?.destroy?.();
+      playerRef.current = null;
+      setPlayerReady(false);
+    };
+  }, [win.youtubeId, win.h]);
+
+  useEffect(() => {
+    if (!win.syncEnabled || !playerReady) return;
+    const interval = setInterval(() => {
+      if (playerRef.current?.getPlayerState?.() === YT.PlayerState.PLAYING) broadcastSync();
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [win.syncEnabled, playerReady, broadcastSync]);
+
+  useEffect(() => {
+    if (!win.syncEnabled || !playerReady) return;
+    send({ t: 'video:state_request', objId: win.id });
+  }, [win.id, win.syncEnabled, playerReady, send]);
+
+  useEffect(() => {
+    return videoBus.subscribe((msg) => {
+      if (msg.t !== 'video:state_request' || msg.objId !== win.id || !win.syncEnabled) return;
+      const p = playerRef.current;
+      if (!p?.getCurrentTime) return;
+      send({
+        t: 'video:sync',
+        objId: win.id,
+        playing: p.getPlayerState() === YT.PlayerState.PLAYING,
+        currentTime: p.getCurrentTime(),
+        videoId: win.youtubeId,
+      });
+    });
+  }, [win.id, win.syncEnabled, win.youtubeId, send]);
+
+  useEffect(() => {
+    if (!syncState || !playerReady || !win.syncEnabled) return;
+    const p = playerRef.current;
+    if (!p?.getCurrentTime) return;
+    applyingRemote.current = true;
+    lastRemoteApply.current = Date.now();
+    const drift = Math.abs(p.getCurrentTime() - syncState.currentTime);
+    if (drift > 1.5) p.seekTo(syncState.currentTime, true);
+    if (syncState.playing) {
+      if (p.getPlayerState() !== YT.PlayerState.PLAYING) p.playVideo();
+    } else if (p.getPlayerState() === YT.PlayerState.PLAYING) {
+      p.pauseVideo();
+    }
+    setTimeout(() => { applyingRemote.current = false; }, 600);
+  }, [syncState, playerReady, win.syncEnabled]);
+
+  return (
+    <div
+      style={{ position: 'absolute', left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.layer, background: '#0F1712', borderRadius: 10, boxShadow: selected ? '0 0 0 3px #E7A93D, 0 12px 24px rgba(0,0,0,0.35)' : '0 12px 24px rgba(0,0,0,0.35)', overflow: 'hidden', border: '1px solid rgba(251,246,236,0.08)' }}
+      onPointerDown={() => { onFocus(); if (connectMode) onClickForConnect(); }}
+    >
+      <div {...dragRef} style={{ height: 30, background: '#1B211D', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', cursor: 'grab', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#8FA396' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: win.syncEnabled ? '#4FB3A9' : '#5A6B60' }} />
+          {win.syncEnabled ? 'watching together' : 'solo'}
+        </span>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button onClick={(e) => { e.stopPropagation(); onChange({ syncEnabled: !win.syncEnabled }); }} style={TINY_BTN}>{win.syncEnabled ? 'unsync' : 'sync'}</button>
+          <XIcon size={13} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDelete(); }} />
+        </div>
+      </div>
+      {IS_FILE_PROTOCOL ? (
+        <VideoFallbackCard youtubeId={win.youtubeId} height={win.h - 30} />
+      ) : (
+        <div ref={playerHostRef} style={{ width: '100%', height: win.h - 30, pointerEvents: connectMode ? 'none' : 'auto' }} />
+      )}
+      <div {...resizeRef} style={RESIZE_HANDLE_STYLE} />
+    </div>
+  );
+}
+
+function ScreenShareWindowCard({ win, selected, onFocus, onChange, onDelete, onClickForConnect, connectMode, viewportZoom, send, myUserId, selfName }) {
+  const dragRef = useDrag(win.x, win.y, (x, y) => onChange({ x, y }), viewportZoom);
+  const resizeRef = useResize(win.w, win.h, (w, h) => onChange({ w: Math.max(260, w), h: Math.max(180, h) }), viewportZoom);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const peerMapRef = useRef(new Map());
+  const [localSharing, setLocalSharing] = useState(false);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [error, setError] = useState(null);
+  const [connecting, setConnecting] = useState(false);
+
+  const isBroadcaster = localSharing || (win.sharing && win.sharerUserId === myUserId);
+  const isViewer = !isBroadcaster && win.sharing && win.sharerUserId && win.sharerUserId !== myUserId;
+  const sharerLabel = win.sharerName || 'Someone';
+
+  const closePeer = useCallback((peerId) => {
+    const pc = peerMapRef.current.get(peerId);
+    if (pc) {
+      pc.close();
+      peerMapRef.current.delete(peerId);
+    }
+  }, []);
+
+  const closeAllPeers = useCallback(() => {
+    peerMapRef.current.forEach((pc) => pc.close());
+    peerMapRef.current.clear();
+  }, []);
+
+  const stopShare = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setLocalSharing(false);
+    closeAllPeers();
+    onChange({ sharing: false, sharerUserId: null, sharerName: null });
+    send({ t: 'screenshare:stop', objId: win.id });
+  }, [closeAllPeers, onChange, send, win.id]);
+
+  const makePeer = useCallback((peerId) => {
+    closePeer(peerId);
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        send({ t: 'webrtc:ice', objId: win.id, candidate: e.candidate, targetUserId: peerId });
+      }
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') closePeer(peerId);
+    };
+    peerMapRef.current.set(peerId, pc);
+    return pc;
+  }, [closePeer, send, win.id]);
+
+  const startBroadcasterPeer = useCallback(async (viewerId) => {
+    if (!streamRef.current) return;
+    const pc = makePeer(viewerId);
+    streamRef.current.getTracks().forEach((track) => pc.addTrack(track, streamRef.current));
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    send({ t: 'webrtc:offer', objId: win.id, sdp: offer, targetUserId: viewerId });
+  }, [makePeer, send, win.id]);
+
+  const startShare = useCallback(async () => {
+    if (win.sharing && win.sharerUserId && win.sharerUserId !== myUserId) {
+      setError(`${sharerLabel} is already sharing in this window.`);
+      return;
+    }
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      streamRef.current = stream;
+      stream.getVideoTracks()[0].addEventListener('ended', stopShare);
+      setLocalSharing(true);
+      onChange({ sharing: true, sharerUserId: myUserId, sharerName: selfName });
+      send({ t: 'screenshare:start', objId: win.id, sharerName: selfName });
+    } catch {
+      setError('Screen share was cancelled or blocked.');
+    }
+  }, [win.sharing, win.sharerUserId, myUserId, sharerLabel, stopShare, onChange, selfName, send, win.id]);
+
+  const connectAsViewer = useCallback(async () => {
+    if (!isViewer || connecting) return;
+    setConnecting(true);
+    setError(null);
+    send({ t: 'webrtc:request', objId: win.id, targetUserId: win.sharerUserId });
+    setTimeout(() => setConnecting(false), 8000);
+  }, [isViewer, connecting, send, win.id, win.sharerUserId]);
+
+  useEffect(() => {
+    if (localSharing && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [localSharing]);
+
+  useEffect(() => {
+    if (remoteStream && videoRef.current) {
+      videoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  useEffect(() => {
+    if (!isViewer) {
+      setRemoteStream(null);
+      closeAllPeers();
+      return;
+    }
+    connectAsViewer();
+  }, [isViewer, win.sharerUserId]);
+
+  useEffect(() => {
+    return rtcBus.subscribe(async (msg) => {
+      if (msg.objId !== win.id || !shouldProcessTargeted(msg, myUserId)) return;
+
+      if (msg.t === 'webrtc:request' && isBroadcaster) {
+        await startBroadcasterPeer(msg.userId);
+      }
+      if (msg.t === 'webrtc:offer' && !isBroadcaster) {
+        const pc = makePeer(msg.userId);
+        pc.ontrack = (e) => {
+          setRemoteStream(e.streams[0] || null);
+          setConnecting(false);
+          setError(null);
+        };
+        await pc.setRemoteDescription(msg.sdp);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        send({ t: 'webrtc:answer', objId: win.id, sdp: answer, targetUserId: msg.userId });
+      }
+      if (msg.t === 'webrtc:answer' && isBroadcaster) {
+        const pc = peerMapRef.current.get(msg.userId);
+        if (pc) await pc.setRemoteDescription(msg.sdp);
+      }
+      if (msg.t === 'webrtc:ice') {
+        const pc = peerMapRef.current.get(msg.userId);
+        if (pc && msg.candidate) {
+          try { await pc.addIceCandidate(msg.candidate); } catch { }
+        }
+      }
+      if (msg.t === 'screenshare:stop') {
+        if (isViewer) {
+          setRemoteStream(null);
+          closeAllPeers();
+        }
+      }
+    });
+  }, [win.id, myUserId, isBroadcaster, isViewer, makePeer, startBroadcasterPeer, closeAllPeers, send]);
+
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    closeAllPeers();
+  }, [closeAllPeers]);
+
+  const showVideo = localSharing || (isViewer && remoteStream);
+  const statusText = localSharing
+    ? 'You are sharing — everyone in the box can see this'
+    : isViewer
+      ? (remoteStream ? `Watching ${sharerLabel}'s screen` : `Connecting to ${sharerLabel}'s screen…`)
+      : 'Screen share';
+
+  return (
+    <div
+      style={{ position: 'absolute', left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.layer, background: '#0F1712', borderRadius: 10, boxShadow: selected ? '0 0 0 3px #E7A93D, 0 12px 24px rgba(0,0,0,0.35)' : '0 12px 24px rgba(0,0,0,0.35)', overflow: 'hidden', border: '1px solid rgba(251,246,236,0.08)' }}
+      onPointerDown={() => { onFocus(); if (connectMode) onClickForConnect(); }}
+    >
+      <div {...dragRef} style={{ height: 30, background: '#1B211D', display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', cursor: 'grab', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#8FA396' }}>
+        <span style={{ width: 6, height: 6, borderRadius: 999, background: (localSharing || remoteStream) ? '#4FB3A9' : '#5A6B60', flexShrink: 0 }} />
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#CBD6CE' }}>
+          {statusText}
+        </span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+          {isViewer && !remoteStream && (
+            <button onClick={(e) => { e.stopPropagation(); connectAsViewer(); }} style={TINY_BTN}>reconnect</button>
+          )}
+          {!isViewer && (
+            <button onClick={(e) => { e.stopPropagation(); localSharing ? stopShare() : startShare(); }} style={TINY_BTN}>{localSharing ? 'stop' : 'start'}</button>
+          )}
+          <XIcon size={13} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDelete(); }} />
+        </div>
+      </div>
+      {showVideo ? (
+        <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: win.h - 30, display: 'block', objectFit: 'contain', background: '#000' }} />
+      ) : (
+        <div style={{ height: win.h - 30, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16, textAlign: 'center' }}>
+          <MonitorIcon size={26} style={{ color: '#5A6B60' }} />
+          <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', lineHeight: 1.5, color: '#8FA396' }}>
+            {error || (isViewer ? `Waiting for ${sharerLabel}'s screen…` : 'Pick a screen, window, or tab to share with everyone in the box.')}
+          </div>
+          {!isViewer && (
+            <button onClick={(e) => { e.stopPropagation(); startShare(); }} style={PRIMARY_BTN}>
+              <MonitorIcon size={13} /> Start sharing
+            </button>
+          )}
+        </div>
+      )}
+      <div {...resizeRef} style={RESIZE_HANDLE_STYLE} />
+    </div>
+  );
+}
+
+function BuildBoardCard({ board, selected, onFocus, onChange, onDelete, onClickForConnect, connectMode, viewportZoom }) {
+  const dragRef = useDrag(board.x, board.y, (x, y) => onChange({ x, y }), viewportZoom);
+  const resizeRef = useResize(board.w, board.h, (w, h) => onChange({ w: Math.max(200, w), h: Math.max(160, h) }), viewportZoom);
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(board.title);
+  useEffect(() => { setTitleDraft(board.title); }, [board.title]);
+  const [newItem, setNewItem] = useState('');
+
+  const commitTitle = () => { onChange({ title: titleDraft.trim() || board.title }); setTitleEditing(false); };
+  const addItem = () => {
+    const text = newItem.trim();
+    if (!text) return;
+    onChange({ items: [...board.items, { id: uid('step'), text, done: false }] });
+    setNewItem('');
+  };
+  const toggleItem = (id) => onChange({ items: board.items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)) });
+  const editItemText = (id, text) => onChange({ items: board.items.map((i) => (i.id === id ? { ...i, text } : i)) });
+  const removeItem = (id) => onChange({ items: board.items.filter((i) => i.id !== id) });
+
+  return (
+    <div
+      style={{ position: 'absolute', left: board.x, top: board.y, width: board.w, height: board.h, zIndex: board.layer, background: '#FBF6EC', borderRadius: 10, boxShadow: selected ? '0 0 0 3px #E7A93D, 4px 8px 16px rgba(0,0,0,0.3)' : '4px 8px 16px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      onPointerDown={() => { onFocus(); if (connectMode) onClickForConnect(); }}
+    >
+      <div {...dragRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'grab', padding: '8px 10px 4px' }}>
+        {titleEditing ? (
+          <input
+            autoFocus
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitTitle(); if (e.key === 'Escape') { setTitleDraft(board.title); setTitleEditing(false); } }}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: '#1B211D', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(27,33,29,0.3)', outline: 'none' }}
+          />
+        ) : (
+          <span onClick={(e) => { e.stopPropagation(); setTitleEditing(true); }} title="Click to rename" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13, color: '#1B211D', cursor: 'text' }}>
+            {board.title}
+          </span>
+        )}
+        <XIcon size={12} style={{ cursor: 'pointer', color: 'rgba(27,33,29,0.55)', flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); onDelete(); }} />
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '2px 10px 6px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {board.items.map((item) => (
+          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }} onPointerDown={(e) => e.stopPropagation()}>
+            <input type="checkbox" checked={item.done} onChange={() => toggleItem(item.id)} style={{ cursor: 'pointer', flexShrink: 0 }} />
+            <input
+              value={item.text}
+              onChange={(e) => editItemText(item.id, e.target.value)}
+              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', fontSize: 12, fontFamily: 'var(--font-body)', color: item.done ? 'rgba(27,33,29,0.4)' : '#1B211D', textDecoration: item.done ? 'line-through' : 'none' }}
+            />
+            <XIcon size={11} style={{ cursor: 'pointer', color: 'rgba(27,33,29,0.4)', flexShrink: 0 }} onClick={() => removeItem(item.id)} />
+          </div>
+        ))}
+        {board.items.length === 0 && (
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'rgba(27,33,29,0.4)', padding: '4px 0' }}>No steps yet.</div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 4, padding: '4px 10px 10px', flexShrink: 0 }} onPointerDown={(e) => e.stopPropagation()}>
+        <input
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') addItem(); }}
+          placeholder="+ add a step…"
+          style={{ flex: 1, minWidth: 0, background: 'rgba(27,33,29,0.06)', border: 'none', borderRadius: 5, fontSize: 11, padding: '5px 7px', outline: 'none', color: '#1B211D' }}
+        />
+      </div>
+      <div {...resizeRef} style={RESIZE_HANDLE_STYLE} />
+    </div>
+  );
+}
+
+function StickyNoteCard({ note, selected, onFocus, onChange, onDelete, onClickForConnect, connectMode, viewportZoom }) {
+  const dragRef = useDrag(note.x, note.y, (x, y) => onChange({ x, y }), viewportZoom);
+  return (
+    <div
+      style={{ position: 'absolute', left: note.x, top: note.y, width: note.w, minHeight: note.h, zIndex: note.layer, background: note.color, borderRadius: 4, padding: 10, boxShadow: selected ? '0 0 0 3px #E7A93D, 4px 8px 16px rgba(0,0,0,0.3)' : '4px 8px 16px rgba(0,0,0,0.3)', transform: 'rotate(-1.2deg)' }}
+      onPointerDown={() => { onFocus(); if (connectMode) onClickForConnect(); }}
+    >
+      <div {...dragRef} style={{ display: 'flex', justifyContent: 'space-between', cursor: 'grab', marginBottom: 6 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'rgba(27,33,29,0.55)' }}>{note.authorName}</span>
+        <XIcon size={12} style={{ cursor: 'pointer', color: 'rgba(27,33,29,0.55)' }} onClick={(e) => { e.stopPropagation(); onDelete(); }} />
+      </div>
+      <textarea value={note.text} onChange={(e) => onChange({ text: e.target.value })} placeholder="Jot a note…" style={{ width: '100%', minHeight: note.h - 40, background: 'transparent', border: 'none', outline: 'none', resize: 'none', fontFamily: 'var(--font-body)', fontSize: 14, color: '#1B211D' }} />
+    </div>
+  );
+}
+
+function SoundboardCard({ board, onFocus, onDelete, onTrigger, viewportZoom }) {
+  const dragRef = useDrag(board.x, board.y, () => {}, viewportZoom);
+  const [flash, setFlash] = useState(null);
+  return (
+    <div style={{ position: 'absolute', left: board.x, top: board.y, zIndex: board.layer, background: '#FBF6EC', borderRadius: 10, padding: 10, boxShadow: '4px 8px 16px rgba(0,0,0,0.3)', width: 200 }} onPointerDown={onFocus}>
+      <div {...dragRef} style={{ display: 'flex', justifyContent: 'space-between', cursor: 'grab', marginBottom: 8 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#5A6B60', display: 'flex', alignItems: 'center', gap: 4 }}><Volume2Icon size={12} /> noise toy</span>
+        <XIcon size={12} style={{ cursor: 'pointer', color: '#5A6B60' }} onClick={(e) => { e.stopPropagation(); onDelete(); }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {board.pack.map((pad) => (
+          <button key={pad.id} onClick={() => { onTrigger(pad.id); setFlash(pad.id); setTimeout(() => setFlash(null), 220); }} style={{ ...SOUND_PAD_STYLE, transform: flash === pad.id ? 'scale(0.94)' : 'scale(1)', background: flash === pad.id ? '#E7A93D' : '#1B211D' }}>
+            <span style={{ fontSize: 16 }}>{pad.emoji}</span>
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)' }}>{pad.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DrawLayer({ strokes }) {
+  return (
+    <svg style={{ position: 'absolute', left: -10000, top: -10000, width: 20000, height: 20000, pointerEvents: 'none' }}>
+      {strokes.map((s) => {
+        const remaining = s.expiresAt - Date.now();
+        const opacity = remaining < 3000 ? Math.max(0, remaining / 3000) : 1;
+        const d = s.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x + 10000} ${p.y + 10000}`).join(' ');
+        return <path key={s.id} d={d} stroke={s.color} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={opacity} />;
+      })}
+    </svg>
+  );
+}
+
+function ConnectorLayer({ connectors, objects, onJump }) {
+  return (
+    <svg style={{ position: 'absolute', left: -10000, top: -10000, width: 20000, height: 20000, overflow: 'visible' }}>
+      {connectors.map((c) => {
+        const from = objects.get(c.fromId);
+        const to = objects.get(c.toId);
+        if (!from || !to) return null;
+        const p1 = { x: from.x + 10000 + centerW(from) / 2, y: from.y + 10000 + centerH(from) / 2 };
+        const p2 = { x: to.x + 10000 + centerW(to) / 2, y: to.y + 10000 + centerH(to) / 2 };
+        const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+        return (
+          <g key={c.id}>
+            <path d={`M ${p1.x} ${p1.y} C ${p1.x} ${mid.y}, ${p2.x} ${mid.y}, ${p2.x} ${p2.y}`} stroke="#4FB3A9" strokeWidth={2} strokeDasharray="6 5" fill="none" opacity={0.85} />
+            <circle cx={mid.x} cy={mid.y} r={9} fill="#4FB3A9" style={{ cursor: 'pointer', pointerEvents: 'all' }} onClick={() => onJump(c.toId)} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function PresenceCursors({ presence, viewport }) {
+  return (
+    <>
+      {Object.values(presence).map((p) => {
+        if (!p.cursor) return null;
+        const screenPt = worldToScreen(p.cursor, viewport);
+        return (
+          <div key={p.userId} style={{ position: 'absolute', left: screenPt.x, top: screenPt.y, pointerEvents: 'none', transition: 'left 0.1s ease, top 0.1s ease', zIndex: 999 }}>
+            <CrosshairIcon size={16} style={{ color: p.color }} />
+            <span style={{ marginLeft: 14, marginTop: -6, display: 'inline-flex', alignItems: 'center', gap: 4, background: p.color, color: '#0F1712', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>
+              {p.name}
+              {p.micOn !== undefined && (p.micOn ? <MicIcon size={10} /> : <MicOffIcon size={10} />)}
+            </span>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function ToolButton({ active, onClick, icon, label }) {
+  return (
+    <button onClick={onClick} title={label} style={{ ...TOOL_BTN_STYLE, background: active ? '#E7A93D' : 'transparent', color: active ? '#1B211D' : '#CBD6CE' }}>
+      {icon}
+    </button>
+  );
+}
+
+function Toolbar({ tool, setTool, urlInput, setUrlInput, onAddVideo, onAddScreenShare, onAddSticky, onAddBuild, onAddSoundboard }) {
+  return (
+    <div style={TOOLBAR_STYLE}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 10, borderRight: '1px solid rgba(251,246,236,0.12)' }}>
+        <input value={urlInput} onChange={(e) => setUrlInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onAddVideo()} placeholder="Paste a YouTube link…" style={URL_INPUT_STYLE} />
+        <button onClick={onAddVideo} style={PRIMARY_BTN} title="Drop it on the table"><PlusIcon size={14} /> Drop</button>
+      </div>
+      <ToolButton active={tool === 'select'} onClick={() => setTool('select')} icon={<MousePointerIcon size={16} />} label="Select" />
+      <ToolButton active={tool === 'draw'} onClick={() => setTool('draw')} icon={<PencilIcon size={16} />} label="Draw" />
+      <ToolButton active={tool === 'connect'} onClick={() => setTool('connect')} icon={<Link2Icon size={16} />} label="Connect" />
+      <div style={{ width: 1, height: 24, background: 'rgba(251,246,236,0.12)' }} />
+      <ToolButton onClick={onAddScreenShare} icon={<MonitorIcon size={16} />} label="Screen share" />
+      <ToolButton onClick={onAddSticky} icon={<StickyIcon size={16} />} label="Sticky note" />
+      <ToolButton onClick={onAddBuild} icon={<ClipboardListIcon size={16} />} label="Build" />
+      <ToolButton onClick={onAddSoundboard} icon={<Volume2Icon size={16} />} label="Noise toy" />
+    </div>
+  );
+}
+
+function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset }) {
+  return (
+    <div style={ZOOM_CTRL_STYLE}>
+      <button onClick={onZoomOut} style={TOOL_BTN_STYLE}><ZoomOutIcon size={14} /></button>
+      <span onClick={onReset} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#CBD6CE', cursor: 'pointer', width: 40, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+      <button onClick={onZoomIn} style={TOOL_BTN_STYLE}><ZoomInIcon size={14} /></button>
+    </div>
+  );
+}
+
+function FileProtocolNotice() {
+  const [copied, setCopied] = useState(false);
+  const copyCmd = async () => {
+    try {
+      await navigator.clipboard.writeText('python3 -m http.server 8000');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { }
+  };
+  return (
+    <div style={FILE_PROTOCOL_NOTICE}>
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Videos won't play inline yet</div>
+      <div style={{ marginBottom: 8 }}>
+        This page is open as a plain file (starts with <code>file://</code>). YouTube requires a real web address.
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <strong>Fix:</strong> run a small local server (e.g. using Python or Node.js) to view this over <code>http://localhost:8000</code>.
+      </div>
+      <button onClick={copyCmd} style={{ ...TINY_BTN, borderColor: 'rgba(231,169,61,0.5)', color: '#E7A93D' }}>{copied ? 'Copied!' : 'Copy server command'}</button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Root component
+// ---------------------------------------------------------------------------
+function UsBoxCanvas() {
+  const containerRef = useRef(null);
+  const [viewport, setViewport] = useState({ x: -400, y: -260, zoom: 1 });
+  const [tool, setTool] = useState('select');
+  const [urlInput, setUrlInput] = useState('');
+
+  const initialRoomRef = useRef(null);
+  if (initialRoomRef.current === null) initialRoomRef.current = initRoomFromLocation();
+  const initialRoom = initialRoomRef.current;
+
+  const [roomCode] = useState(initialRoom.code);
+  const [roomTitle, setRoomTitle] = useState(initialRoom.title);
+  const [objects, setObjects] = useState(initialRoom.objects);
+  const [strokes, setStrokes] = useState([]);
+  const [connectors, setConnectors] = useState(initialRoom.connectors);
+  const [connectFrom, setConnectFrom] = useState(null);
+  const [savedRooms, setSavedRooms] = useState(() => upsertSavedRoom(initialRoom.code, initialRoom.title));
+  const [showRoomPanel, setShowRoomPanel] = useState(false);
+  const [videoSyncStates, setVideoSyncStates] = useState({});
+
+  // Sound triggering AudioContext fallback
+  const playLocalBeep = (freq, type = 'sine') => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } catch {}
+  };
+
+  // Remote updates event router
+  const handleRemoteSync = useCallback((msg) => {
+    if (msg.t === 'room:initial_sync') {
+      // Received the current layout from the oldest active peer in the room
+      setRoomTitle(msg.title);
+      setObjects(msg.objects);
+      setConnectors(msg.connectors);
+    }
+    if (msg.t === 'object:create') {
+      setObjects((prev) => {
+        if (prev.some((o) => o.id === msg.obj.id)) return prev;
+        return [...prev, msg.obj];
+      });
+    }
+    if (msg.t === 'object:update') {
+      setObjects((prev) => prev.map((o) => (o.id === msg.objId ? { ...o, ...msg.patch } : o)));
+    }
+    if (msg.t === 'object:delete') {
+      setObjects((prev) => prev.filter((o) => o.id !== msg.objId));
+      setConnectors((prev) => prev.filter((c) => c.fromId !== msg.objId && c.toId !== msg.objId));
+    }
+    if (msg.t === 'title:rename') {
+      setRoomTitle(msg.title);
+    }
+    if (msg.t === 'draw:stroke') {
+      setStrokes((prev) => {
+        if (prev.some((s) => s.id === msg.strokeId)) return prev;
+        return [...prev, { id: msg.strokeId, points: msg.points, color: msg.color, expiresAt: msg.expiresAt }];
+      });
+    }
+    if (msg.t === 'connector:create') {
+      setConnectors((prev) => {
+        if (prev.some((c) => c.id === msg.connector.id)) return prev;
+        return [...prev, msg.connector];
+      });
+    }
+    if (msg.t === 'sound:trigger') {
+      const soundFrequencies = { airhorn: 440, laugh: 330, buzzer: 180, applause: 600 };
+      playLocalBeep(soundFrequencies[msg.soundId] || 440, msg.soundId === 'buzzer' ? 'sawtooth' : 'sine');
+    }
+    if (msg.t === 'video:sync') {
+      setVideoSyncStates((prev) => ({
+        ...prev,
+        [msg.objId]: { playing: msg.playing, currentTime: msg.currentTime, videoId: msg.videoId, userId: msg.userId, ts: Date.now() },
+      }));
+    }
+    if (msg.t === 'video:state_request') {
+      videoBus.emit(msg);
+    }
+    if (msg.t === 'screenshare:start') {
+      setObjects((prev) => prev.map((o) => (
+        o.id === msg.objId ? { ...o, sharing: true, sharerUserId: msg.userId, sharerName: msg.sharerName || 'Someone' } : o
+      )));
+    }
+    if (msg.t === 'screenshare:stop') {
+      setObjects((prev) => prev.map((o) => (
+        o.id === msg.objId ? { ...o, sharing: false, sharerUserId: null, sharerName: null } : o
+      )));
+      rtcBus.emit(msg);
+    }
+    if (msg.t?.startsWith('webrtc:')) {
+      rtcBus.emit(msg);
+    }
+  }, []);
+
+  // Pass current local state accessor to useRoomSocket to share with joining clients
+  const getLocalState = useCallback(() => {
+    return { title: roomTitle, objects, connectors };
+  }, [roomTitle, objects, connectors]);
+
+  const { send, presence, myUserId } = useRoomSocket(roomCode, SELF_NAME, SELF_COLOR, handleRemoteSync, getLocalState);
+
+  const [micOn, setMicOn] = useState(false);
+  const [micError, setMicError] = useState(null);
+  const micStreamRef = useRef(null);
+
+  const toggleMic = useCallback(async () => {
+    if (micOn) {
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+      setMicOn(false);
+      setMicError(null);
+      send({ t: 'presence:mic', micOn: false });
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      setMicOn(true);
+      setMicError(null);
+      send({ t: 'presence:mic', micOn: true });
+    } catch (err) {
+      setMicError("Couldn't access your microphone.");
+    }
+  }, [micOn, send]);
+
+  useEffect(() => () => { micStreamRef.current?.getTracks().forEach((t) => t.stop()); }, []);
+
+  // Save changes locally
+  useEffect(() => {
+    const t = setTimeout(() => {
+      saveRoomState(roomCode, { title: roomTitle, objects, connectors });
+      setSavedRooms(upsertSavedRoom(roomCode, roomTitle));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [roomCode, roomTitle, objects, connectors]);
+
+  // Synchronize title changes across users
+  const handleRenameTitle = useCallback((newTitle) => {
+    setRoomTitle(newTitle);
+    send({ t: 'title:rename', title: newTitle });
+  }, [send]);
+
+  const goToRoom = useCallback((code) => {
+    setRoomCodeInLocation(code);
+    window.location.reload();
+  }, []);
+  const handleCreateNewRoom = useCallback(() => goToRoom(genRoomCode()), [goToRoom]);
+  const handleJoinRoom = useCallback((code) => goToRoom(code), [goToRoom]);
+  const handleSwitchRoom = useCallback((code) => goToRoom(code), [goToRoom]);
+  const handleRemoveSavedRoom = useCallback((code) => setSavedRooms(removeSavedRoom(code)), []);
+
+  useEffect(() => {
+    const onHashChange = () => window.location.reload();
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, y: 0 });
+  const viewportStart = useRef(viewport);
+  const spaceHeld = useRef(false);
+  const activeStroke = useRef(null);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      const now = Date.now();
+      setStrokes((prev) => prev.filter((s) => s.expiresAt > now));
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const down = (e) => { if (e.code === 'Space') spaceHeld.current = true; };
+    const up = (e) => { if (e.code === 'Space') spaceHeld.current = false; };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+  }, []);
+
+  const lastCursorSend = useRef(0);
+  const onPointerMove = useCallback((e) => {
+    const rect = containerRef.current.getBoundingClientRect();
+    const screenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const worldPt = screenToWorld(screenPt, viewport);
+    const now = performance.now();
+    if (now - lastCursorSend.current > 45) {
+      lastCursorSend.current = now;
+      send({ t: 'presence:cursor', x: worldPt.x, y: worldPt.y });
+    }
+    if (isPanning.current) {
+      const dx = e.clientX - panStart.current.x;
+      const dy = e.clientY - panStart.current.y;
+      setViewport({ ...viewportStart.current, x: viewportStart.current.x - dx / viewportStart.current.zoom, y: viewportStart.current.y - dy / viewportStart.current.zoom });
+    }
+    if (tool === 'draw' && activeStroke.current) {
+      activeStroke.current.points.push(worldPt);
+      setStrokes((prev) => [...prev.slice(0, -1), { ...activeStroke.current }]);
+    }
+  }, [viewport, tool, send]);
+
+  const onPointerDown = useCallback((e) => {
+    const isMiddle = e.button === 1;
+    const wantsPan = isMiddle || spaceHeld.current;
+    if (wantsPan) {
+      e.preventDefault();
+      isPanning.current = true;
+      panStart.current = { x: e.clientX, y: e.clientY };
+      viewportStart.current = viewport;
+      return;
+    }
+    if (tool === 'draw' && e.button === 0) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const worldPt = screenToWorld({ x: e.clientX - rect.left, y: e.clientY - rect.top }, viewport);
+      const stroke = { id: uid('stroke'), points: [worldPt], color: SELF_COLOR, createdAt: Date.now(), expiresAt: Date.now() + 15000 };
+      activeStroke.current = stroke;
+      setStrokes((prev) => [...prev, stroke]);
+    }
+  }, [viewport, tool]);
+
+  const onPointerUp = useCallback(() => {
+    isPanning.current = false;
+    if (activeStroke.current) {
+      send({ t: 'draw:stroke', strokeId: activeStroke.current.id, points: activeStroke.current.points, color: activeStroke.current.color, expiresAt: activeStroke.current.expiresAt });
+    }
+    activeStroke.current = null;
+  }, [send]);
+
+  const viewportRef = useRef(viewport);
+  useEffect(() => { viewportRef.current = viewport; }, [viewport]);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handleWheel = (e) => {
+      e.preventDefault();
+      const vp = viewportRef.current;
+      const rect = el.getBoundingClientRect();
+      const screenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const worldBefore = screenToWorld(screenPt, vp);
+      const nextZoom = clamp(vp.zoom * (e.deltaY < 0 ? 1.08 : 0.93), 0.2, 3);
+      const nextVp = { ...vp, zoom: nextZoom };
+      const worldAfter = screenToWorld(screenPt, nextVp);
+      setViewport({ zoom: nextZoom, x: nextVp.x + (worldBefore.x - worldAfter.x), y: nextVp.y + (worldBefore.y - worldAfter.y) });
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  const bringToFront = useCallback((id) => {
+    setObjects((prev) => { 
+      const maxLayer = Math.max(0, ...prev.map((o) => o.layer)); 
+      const next = prev.map((o) => (o.id === id ? { ...o, layer: maxLayer + 1 } : o));
+      const target = next.find(o => o.id === id);
+      if (target) send({ t: 'object:update', objId: id, patch: { layer: target.layer } });
+      return next;
+    });
+  }, [send]);
+
+  const updateObject = useCallback((id, patch) => { 
+    setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o))); 
+    send({ t: 'object:update', objId: id, patch });
+  }, [send]);
+
+  const deleteObject = useCallback((id) => { 
+    setObjects((prev) => prev.filter((o) => o.id !== id)); 
+    setConnectors((prev) => prev.filter((c) => c.fromId !== id && c.toId !== id)); 
+    send({ t: 'object:delete', objId: id });
+  }, [send]);
+
+  const addVideoFromUrl = useCallback(() => {
+    const ytId = extractYouTubeId(urlInput.trim());
+    if (!ytId) return;
+    const center = screenToWorld({ x: (containerRef.current?.clientWidth ?? 800) / 2, y: (containerRef.current?.clientHeight ?? 600) / 2 }, viewport);
+    const win = { kind: 'video', id: uid('vid'), youtubeId: ytId, x: center.x - 180, y: center.y - 110, w: 360, h: 220, layer: nextLayer(objects), syncEnabled: true };
+    setObjects((prev) => [...prev, win]);
+    send({ t: 'object:create', obj: win });
+    setUrlInput('');
+  }, [urlInput, viewport, objects, send]);
+
+  const addScreenShare = useCallback(() => {
+    const center = screenToWorld({ x: (containerRef.current?.clientWidth ?? 800) / 2, y: (containerRef.current?.clientHeight ?? 600) / 2 }, viewport);
+    const win = { kind: 'screenshare', id: uid('share'), x: center.x - 200, y: center.y - 140, w: 400, h: 280, layer: nextLayer(objects), sharing: false, sharerUserId: null, sharerName: null };
+    setObjects((prev) => [...prev, win]);
+    send({ t: 'object:create', obj: win });
+  }, [viewport, objects, send]);
+
+  const addSticky = useCallback(() => {
+    const center = screenToWorld({ x: (containerRef.current?.clientWidth ?? 800) / 2 + 40, y: (containerRef.current?.clientHeight ?? 600) / 2 - 60 }, viewport);
+    const note = { kind: 'sticky', id: uid('sticky'), x: center.x, y: center.y, w: 180, h: 160, layer: nextLayer(objects), color: pick(['#F4D35E', '#F2A65A', '#B5E48C', '#90DBF4']), text: '', authorName: SELF_NAME };
+    setObjects((prev) => [...prev, note]);
+    send({ t: 'object:create', obj: note });
+  }, [viewport, objects, send]);
+
+  const addBuild = useCallback(() => {
+    const center = screenToWorld({ x: (containerRef.current?.clientWidth ?? 800) / 2 + 220, y: (containerRef.current?.clientHeight ?? 600) / 2 - 80 }, viewport);
+    const board = { kind: 'build', id: uid('build'), x: center.x, y: center.y, w: 220, h: 220, layer: nextLayer(objects), title: 'Build plan', items: [] };
+    setObjects((prev) => [...prev, board]);
+    send({ t: 'object:create', obj: board });
+  }, [viewport, objects, send]);
+
+  const addSoundboard = useCallback(() => {
+    const center = screenToWorld({ x: (containerRef.current?.clientWidth ?? 800) / 2 - 200, y: (containerRef.current?.clientHeight ?? 600) / 2 + 100 }, viewport);
+    const board = { kind: 'soundboard', id: uid('sb'), x: center.x, y: center.y, layer: nextLayer(objects), pack: SOUND_PACK };
+    setObjects((prev) => [...prev, board]);
+    send({ t: 'object:create', obj: board });
+  }, [viewport, objects, send]);
+
+  const handleObjectClickForConnect = useCallback((id) => {
+    if (tool !== 'connect') return;
+    if (!connectFrom) { setConnectFrom(id); return; }
+    if (connectFrom !== id) {
+      const newConn = { id: uid('conn'), fromId: connectFrom, toId: id };
+      setConnectors((prev) => [...prev, newConn]);
+      send({ t: 'connector:create', connector: newConn });
+    }
+    setConnectFrom(null);
+  }, [tool, connectFrom, send]);
+
+  const jumpToObject = useCallback((id) => {
+    const obj = objects.find((o) => o.id === id);
+    if (!obj) return;
+    const w = containerRef.current?.clientWidth ?? 800;
+    const h = containerRef.current?.clientHeight ?? 600;
+    setViewport((vp) => ({ ...vp, x: obj.x - w / (2 * vp.zoom) + 100, y: obj.y - h / (2 * vp.zoom) + 60 }));
+  }, [objects]);
+
+  const objectById = useMemo(() => { const m = new Map(); objects.forEach((o) => m.set(o.id, o)); return m; }, [objects]);
+  const canvasBound = IS_PREMIUM ? null : FREE_CANVAS_BOUND;
+
+  return (
+    <div style={ROOT_STYLE}>
+      <TopBar
+        userCount={Object.keys(presence).length + 1}
+        roomTitle={roomTitle}
+        onRenameTitle={handleRenameTitle}
+        roomCode={roomCode}
+        premium={IS_PREMIUM}
+        roomPanelOpen={showRoomPanel}
+        onToggleRoomPanel={() => setShowRoomPanel((v) => !v)}
+        micOn={micOn}
+        onToggleMic={toggleMic}
+        micError={micError}
+      />
+      {showRoomPanel && (
+        <RoomPanel
+          roomCode={roomCode}
+          savedRooms={savedRooms}
+          onCreateNew={handleCreateNewRoom}
+          onJoin={handleJoinRoom}
+          onSwitch={handleSwitchRoom}
+          onRemove={handleRemoveSavedRoom}
+          onClose={() => setShowRoomPanel(false)}
+        />
+      )}
+      <div
+        ref={containerRef}
+        style={{ ...CANVAS_STYLE, cursor: tool === 'draw' ? 'crosshair' : 'grab' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+      >
+        <FeltBackground viewport={viewport} bound={canvasBound} />
+        <div style={{ position: 'absolute', left: 0, top: 0, transform: `scale(${viewport.zoom}) translate(${-viewport.x}px, ${-viewport.y}px)`, transformOrigin: '0 0' }}>
+          <ConnectorLayer connectors={connectors} objects={objectById} onJump={jumpToObject} />
+          {objects.slice().sort((a, b) => a.layer - b.layer).map((obj) => {
+            if (obj.kind === 'video') {
+              return <VideoWindowCard key={obj.id} win={obj} selected={connectFrom === obj.id} onFocus={() => bringToFront(obj.id)} onChange={(patch) => updateObject(obj.id, patch)} onDelete={() => deleteObject(obj.id)} onClickForConnect={() => handleObjectClickForConnect(obj.id)} connectMode={tool === 'connect'} viewportZoom={viewport.zoom} send={send} syncState={videoSyncStates[obj.id]} />;
+            }
+            if (obj.kind === 'screenshare') {
+              return <ScreenShareWindowCard key={obj.id} win={obj} selected={connectFrom === obj.id} onFocus={() => bringToFront(obj.id)} onChange={(patch) => updateObject(obj.id, patch)} onDelete={() => deleteObject(obj.id)} onClickForConnect={() => handleObjectClickForConnect(obj.id)} connectMode={tool === 'connect'} viewportZoom={viewport.zoom} send={send} myUserId={myUserId} selfName={SELF_NAME} />;
+            }
+            if (obj.kind === 'sticky') {
+              return <StickyNoteCard key={obj.id} note={obj} selected={connectFrom === obj.id} onFocus={() => bringToFront(obj.id)} onChange={(patch) => updateObject(obj.id, patch)} onDelete={() => deleteObject(obj.id)} onClickForConnect={() => handleObjectClickForConnect(obj.id)} connectMode={tool === 'connect'} viewportZoom={viewport.zoom} />;
+            }
+            if (obj.kind === 'build') {
+              return <BuildBoardCard key={obj.id} board={obj} selected={connectFrom === obj.id} onFocus={() => bringToFront(obj.id)} onChange={(patch) => updateObject(obj.id, patch)} onDelete={() => deleteObject(obj.id)} onClickForConnect={() => handleObjectClickForConnect(obj.id)} connectMode={tool === 'connect'} viewportZoom={viewport.zoom} />;
+            }
+            return <SoundboardCard key={obj.id} board={obj} onFocus={() => bringToFront(obj.id)} onDelete={() => deleteObject(obj.id)} onTrigger={(soundId) => { send({ t: 'sound:trigger', soundId }); playLocalBeep(soundId === 'buzzer' ? 180 : 440); }} viewportZoom={viewport.zoom} />;
+          })}
+          <DrawLayer strokes={strokes} />
+        </div>
+        <PresenceCursors presence={presence} viewport={viewport} />
+      </div>
+      <Toolbar tool={tool} setTool={setTool} urlInput={urlInput} setUrlInput={setUrlInput} onAddVideo={addVideoFromUrl} onAddScreenShare={addScreenShare} onAddSticky={addSticky} onAddBuild={addBuild} onAddSoundboard={addSoundboard} />
+      <ZoomControls zoom={viewport.zoom} onZoomIn={() => setViewport((vp) => ({ ...vp, zoom: clamp(vp.zoom * 1.15, 0.2, 3) }))} onZoomOut={() => setViewport((vp) => ({ ...vp, zoom: clamp(vp.zoom / 1.15, 0.2, 3) }))} onReset={() => setViewport({ x: -400, y: -260, zoom: 1 })} />
+      {!IS_PREMIUM && (
+        <div style={FREE_TIER_BADGE}>
+          Live Room · {FREE_CANVAS_BOUND}×{FREE_CANVAS_BOUND} bounds · <span style={{ color: '#E7A93D', fontWeight: 600 }}>Videos & screen share sync</span>
+        </div>
+      )}
+      {IS_FILE_PROTOCOL && <FileProtocolNotice />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<UsBoxCanvas />);
+</script>
+</body>
+</html>
